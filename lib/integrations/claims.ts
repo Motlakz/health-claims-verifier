@@ -499,12 +499,23 @@ async function extractInfluencerDetails(rawText: string, contentSources: any[]):
 
     if (extractedJson) {
       try {
-        const cleanedJson = extractedJson
-          .replace(/```json/g, '')
-          .replace(/```/g, '')
-          .replace(/^`+/gm, '') // Remove any leading backticks in lines
-          .replace(/`+$/gm, '') // Remove any trailing backticks in lines
-          .trim();
+        // Improved JSON extraction with multiple fallbacks
+        let cleanedJson = extractedJson;
+    
+        // First try to extract JSON from code blocks
+        const codeBlockMatch = cleanedJson.match(/```json\n([\s\S]*?)\n```/);
+        if (codeBlockMatch) {
+          cleanedJson = codeBlockMatch[1];
+        } else {
+          // Fallback 1: Remove any remaining backticks
+          cleanedJson = cleanedJson.replace(/```/g, '');
+          // Fallback 2: Extract first JSON object
+          const jsonMatch = cleanedJson.match(/\{[\s\S]*\}/);
+          if (jsonMatch) cleanedJson = jsonMatch[0];
+        }
+    
+        // Final cleanup and parse
+        cleanedJson = cleanedJson.trim();
         const parsedData = JSON.parse(cleanedJson);
         
         // Extract basic details and metrics
