@@ -101,7 +101,6 @@ export function InfluencerLeaderboard({ className }: { className?: string }) {
                 <TableHead>Influencer</TableHead>
                 <TableHead>Trust Score</TableHead>
                 <TableHead>Platform</TableHead>
-                <TableHead>Followers</TableHead>
                 <TableHead>Claims</TableHead>
               </TableRow>
             </TableHeader>
@@ -153,9 +152,6 @@ export function InfluencerLeaderboard({ className }: { className?: string }) {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{influencer.platform}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Intl.NumberFormat().format(influencer.followerCount)}
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">

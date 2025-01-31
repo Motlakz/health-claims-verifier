@@ -37,7 +37,7 @@ export function DashboardNav() {
     const pathname = usePathname()
 
     return (
-        <nav className="grid items-start gap-2">
+        <nav className="grid items-start gap-2 text-lg">
             {items.map((item) => {
                 const Icon = item.icon
                 return (

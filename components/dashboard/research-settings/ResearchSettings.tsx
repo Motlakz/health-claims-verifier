@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ResearchTasksTab from './ResearchTasks'
 import SpecificInfluencerTab from './InfluencerResearch'
 import DiscoverNewTab from './DiscoveryTab'
-import { LogOut } from 'lucide-react'
+import { AlertCircle, LogOut } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ResearchSettings() {
@@ -17,7 +17,13 @@ export default function ResearchSettings() {
         <div className="grid min-h-screen w-full">
             <div className="flex flex-col p-4 md:p-6">
                 <div className="flex items-center justify-between mb-6">
-                    <h1 className="text-2xl font-bold">Research Configuration</h1>
+                    <div className="flex flex-col">
+                        <h1 className="text-2xl font-bold">Research Configuration</h1>
+                        <span className="text-orange-600 flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5" />
+                            (Currently static since most of the logic is rotated within the APIs via multi-modal approach)
+                        </span>
+                    </div>
                     <Button asChild variant="outline">
                         <Link href="/">Sign Out <LogOut className="w-5 h-5" /></Link>
                     </Button>
