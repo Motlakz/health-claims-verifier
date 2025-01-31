@@ -185,19 +185,19 @@ async function fetchContentForClaim(identifier: string, category: string, usedLi
   }
 }
 
-async function batchCategorizeClaims(texts: string[]): Promise<{ category: HealthClaimCategory, confidence: number }[]> {
+// Helper function to categorize claims
+async function categorizeClaim(text: string): Promise<{ category: HealthClaimCategory, confidence: number }> {
   try {
     const openaiRes = await openaiLimit(() => openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{
         role: "system",
-        content: "Categorize these claims into: Nutrition, Medicine, Mental Health, Fitness, Sleep, Performance, Neuroscience. Return a JSON array of category strings in the same order."
+        content: "Categorize into: Nutrition, Medicine, Mental Health, Fitness, Sleep, Performance, Neuroscience. Only category name."
       }, {
         role: "user",
-        content: JSON.stringify(texts)
+        content: text
       }],
-      response_format: { type: "json_object" },
-      max_tokens: 400
+      max_tokens: 20
     }));
 
     const validCategories: HealthClaimCategory[] = [
@@ -213,125 +213,91 @@ async function batchCategorizeClaims(texts: string[]): Promise<{ category: Healt
         : 'Uncategorized';
     };
 
-    const responseContent = openaiRes.choices[0]?.message?.content;
-    if (!responseContent) {
-      return texts.map(() => ({
-        category: 'Uncategorized',
-        confidence: 0
-      }));
-    }
+    const category = getValidCategory(openaiRes.choices[0]?.message?.content || '');
 
-    const parsedResponse = JSON.parse(responseContent);
-    const categories = parsedResponse.categories || [];
-
-    return texts.map((_, index) => {
-      const category = getValidCategory(categories[index] || 'Uncategorized');
-      return {
-        category,
-        confidence: category === 'Uncategorized' ? 0 : 100
-      };
-    });
+    return {
+      category,
+      confidence: 100 // Single source, so confidence is either 100 or 0
+    };
   } catch (error) {
-    console.error("Batch categorization error:", error);
-    return texts.map(() => ({
+    console.error("Categorization error:", error);
+    return {
       category: 'Uncategorized',
       confidence: 0
-    }));
+    };
   }
 }
 
-// Batch verification function
-async function batchVerifyClaims(claims: { content: string, category: HealthClaimCategory }[], influencerIdentifier: string, globalUsedLinks: Set<string>) {
+// Helper function to verify claims
+async function verifyClaim(content: string, category: HealthClaimCategory, influencerIdentifier: string, globalUsedLinks: Set<string>) {
   try {
-    return await Promise.all(
-      claims.map(async ({ content, category }) => {
-        try {
-          const contentSources = await fetchContentForClaim(influencerIdentifier, category, globalUsedLinks);
+    const contentSources = await fetchContentForClaim(influencerIdentifier, category, globalUsedLinks);
 
-          const serperResponse = await serperLimit(() => fetch("https://google.serper.dev/search", {
-            method: "POST",
-            headers: {
-              "X-API-KEY": process.env.SERPER_API_KEY!,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              q: `${content} scientific research site:.gov OR site:.edu OR site:jamanetwork.com OR site:thelancet.com`,
-              num: 2,
-              gl: "us",
-              hl: "en"
-            })
-          }));
-
-          const serperData = await serperResponse.json();
-          const scientificSources = serperData.organic
-            ?.map((item: any) => item.link)
-            ?.filter((link: string) => !globalUsedLinks.has(link)) || [];
-
-          scientificSources.forEach((link: string) => globalUsedLinks.add(link));
-
-          let status: VerificationStatus;
-          if (scientificSources.length >= 2) {
-            const contradictionCheck = await perplexityLimit(() => perplexity.chat.completions.create({
-              model: "llama-3.1-sonar-small-128k-online",
-              messages: [{
-                role: "system",
-                content: "Analyze if these sources support or contradict the claim. Response: SUPPORTS/CONTRADICTS"
-              }, {
-                role: "user",
-                content: `Claim: ${content}\nSources: ${scientificSources.join(", ")}`
-              }],
-              max_tokens: 100
-            }));
-
-            const analysis = contradictionCheck.choices[0]?.message?.content?.trim().toUpperCase();
-            status = analysis === 'CONTRADICTS' ? 'Debunked' : 'Verified';
-          } else {
-            status = 'Questionable';
-          }
-
-          return {
-            id: `claim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-            content,
-            category,
-            verificationStatus: status,
-            trustScore: calculateTrustScore(scientificSources, status),
-            sources: {
-              contentSources,
-              scientificSources
-            },
-            influencerId: influencerIdentifier,
-            createdAt: new Date(),
-            analysis: status === 'Verified' 
-              ? `Verified with ${scientificSources.length} trusted sources`
-              : status === 'Debunked'
-              ? "Scientific evidence contradicts this claim"
-              : "Insufficient scientific evidence"
-          };
-        } catch (error) {
-          console.error("Verification failed for claim:", error);
-          return {
-            id: `claim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-            content,
-            category: "Uncategorized" as HealthClaimCategory,
-            verificationStatus: "Questionable" as VerificationStatus,
-            trustScore: 40,
-            sources: {
-              contentSources: [],
-              scientificSources: []
-            },
-            influencerId: influencerIdentifier,
-            createdAt: new Date(),
-            analysis: "Verification failed due to API error"
-          };
-        }
+    const serperResponse = await serperLimit(() => fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": process.env.SERPER_API_KEY!,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        q: `${content} scientific research site:.gov OR site:.edu OR site:jamanetwork.com OR site:thelancet.com`,
+        num: 2,
+        gl: "us",
+        hl: "en"
       })
-    );
-  } catch (error) {
-    console.error("Batch verification error:", error);
-    return claims.map(({ content, category }) => ({
+    }));
+
+    const serperData = await serperResponse.json();
+    const scientificSources = serperData.organic
+      ?.map((item: any) => item.link)
+      ?.filter((link: string) => !globalUsedLinks.has(link)) || [];
+
+    scientificSources.forEach((link: string) => globalUsedLinks.add(link));
+
+    let status: VerificationStatus;
+    if (scientificSources.length >= 2) {
+      const contradictionCheck = await perplexityLimit(() => perplexity.chat.completions.create({
+        model: "llama-3.1-sonar-small-128k-online",
+        messages: [{
+          role: "system",
+          content: "Analyze if these sources support or contradict the claim. Response: SUPPORTS/CONTRADICTS"
+        }, {
+          role: "user",
+          content: `Claim: ${content}\nSources: ${scientificSources.join(", ")}`
+        }],
+        max_tokens: 100
+      }));
+
+      const analysis = contradictionCheck.choices[0]?.message?.content?.trim().toUpperCase();
+      status = analysis === 'CONTRADICTS' ? 'Debunked' : 'Verified';
+    } else {
+      status = 'Questionable';
+    }
+
+    return {
       id: `claim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       content,
       category,
+      verificationStatus: status,
+      trustScore: calculateTrustScore(scientificSources, status),
+      sources: {
+        contentSources,
+        scientificSources
+      },
+      influencerId: influencerIdentifier,
+      createdAt: new Date(),
+      analysis: status === 'Verified' 
+        ? `Verified with ${scientificSources.length} trusted sources`
+        : status === 'Debunked'
+        ? "Scientific evidence contradicts this claim"
+        : "Insufficient scientific evidence"
+    };
+  } catch (error) {
+    console.error("Verification failed:", error);
+    return {
+      id: `claim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+      content,
+      category: "Uncategorized" as HealthClaimCategory,
       verificationStatus: "Questionable" as VerificationStatus,
       trustScore: 40,
       sources: {
@@ -340,12 +306,12 @@ async function batchVerifyClaims(claims: { content: string, category: HealthClai
       },
       influencerId: influencerIdentifier,
       createdAt: new Date(),
-      analysis: "Batch verification failed"
-    }));
+      analysis: "Verification failed due to API error"
+    };
   }
 }
 
-// ProcessClaims function with batch processing
+// Main function to process claims
 export async function processClaims(influencerIdentifier: string) {
   try {
     // Phase 1: Fetch and prepare content
@@ -362,7 +328,7 @@ export async function processClaims(influencerIdentifier: string) {
 
     // Phase 3: Extract and categorize claims
     console.log("Phase 3: Extracting and categorizing claims...");
-    const extractionResponse = await perplexityLimit(() => perplexity.chat.completions.create({
+    const extractionResponse = await perplexityLimit(() => openai.chat.completions.create({
       model: "llama-3.1-sonar-small-128k-online",
       messages: [{
         role: "system",
@@ -380,9 +346,9 @@ export async function processClaims(influencerIdentifier: string) {
       ?.map(line => line.substring(2)) || [];
 
     const embeddingResponse = await openaiLimit(() => openai.embeddings.create({
-      model: "text-embedding-3-large",
+      model: "text-embedding-3-small",
       input: rawClaims,
-    }));
+    }))
 
     const uniqueClaims = embeddingResponse.data.reduce((acc, curr, index) => {
       const isDuplicate = acc.some(existing => 
@@ -391,25 +357,27 @@ export async function processClaims(influencerIdentifier: string) {
       if (!isDuplicate) {
         acc.push({ text: rawClaims[index], embedding: curr.embedding });
       }
-      return acc;
+      return acc
     }, [] as { text: string; embedding: number[] }[]);
 
-    // Batch categorization
-    const textsToCategorize = uniqueClaims.map(claim => claim.text);
-    const batchCategorizationResults = await batchCategorizeClaims(textsToCategorize);
+    const categorizedClaims = await Promise.all(
+      uniqueClaims.map(async ({ text }) => {
+        const { category, confidence } = await categorizeClaim(text);
+        return {
+          content: text,
+          category,
+          confidence
+        };
+      })
+    );
 
-    const categorizedClaims = uniqueClaims.map((claim, index) => ({
-      content: claim.text,
-      ...batchCategorizationResults[index]
-    }));
-
-    // Phase 4: Batch verification
+    // Phase 4: Verify claims
     console.log("Phase 4: Verifying claims...");
     const globalUsedLinks = new Set<string>(usedLinks);
-    const verifiedClaims = await batchVerifyClaims(
-      categorizedClaims.map(({ content, category }) => ({ content, category })),
-      influencerIdentifier,
-      globalUsedLinks
+    const verifiedClaims = await Promise.all(
+      categorizedClaims.map(async ({ content, category }) => 
+        verifyClaim(content, category, influencerIdentifier, globalUsedLinks)
+      )
     );
 
     // Phase 5: Save claims and update influencer stats
@@ -464,17 +432,17 @@ async function extractInfluencerDetails(rawText: string, contentSources: any[]):
       model: "gpt-4o-mini",
       messages: [{
         role: "system",
-        content: `Extract the influencer's details as valid JSON without markdown formatting based on their name, handle, platform, follower count, likes count, comments count, shares, and average views from the provided text. 
-        Required format: {
-          "name": string,
-          "handle": string,
-          "platform": string,
-          "followerCount": number,
-          "likes": number,
-          "comments": number,
-          "shares": number,
-          "avgViews": number,
-          "lastUploadDate": string (ISO format)
+        content: `Extract the influencer's details based on their name, handle, platform, follower count, likes count, comments count, shares, and average views from the provided text. 
+        Respond in JSON format: {
+          name: string,
+          handle: string,
+          platform: string,
+          followerCount: number,
+          likes: number,
+          comments: number,
+          shares: number,
+          avgViews: number,
+          lastUploadDate: string (ISO format)
         }`
       }, {
         role: "user",
@@ -499,23 +467,7 @@ async function extractInfluencerDetails(rawText: string, contentSources: any[]):
 
     if (extractedJson) {
       try {
-        // Improved JSON extraction with multiple fallbacks
-        let cleanedJson = extractedJson;
-    
-        // First try to extract JSON from code blocks
-        const codeBlockMatch = cleanedJson.match(/```json\n([\s\S]*?)\n```/);
-        if (codeBlockMatch) {
-          cleanedJson = codeBlockMatch[1];
-        } else {
-          // Fallback 1: Remove any remaining backticks
-          cleanedJson = cleanedJson.replace(/```/g, '');
-          // Fallback 2: Extract first JSON object
-          const jsonMatch = cleanedJson.match(/\{[\s\S]*\}/);
-          if (jsonMatch) cleanedJson = jsonMatch[0];
-        }
-    
-        // Final cleanup and parse
-        cleanedJson = cleanedJson.trim();
+        const cleanedJson = extractedJson.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsedData = JSON.parse(cleanedJson);
         
         // Extract basic details and metrics
