@@ -6,18 +6,13 @@ import { calculateTrustScore, cosineSimilarity } from "@/lib/utils"
 import { HealthClaim, HealthClaimCategory, VerificationStatus } from "@/types"
 import { saveClaimsToAppwrite } from "../claims/savingClaims"
 import { updateInfluencerStats } from "../influencers/updateInfluencerStats"
+import { openaiLimit, perplexityLimit, serperLimit } from "./rateLimiter"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
-
 const perplexity = new OpenAI({
   apiKey: process.env.PERPLEXITY_API_KEY!,
   baseURL: "https://api.perplexity.ai"
 })
-
-const deepseek = new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: process.env.DEEPSEEK_BASE_URL
-});
 
 // Helper function to fetch Apple Podcast transcripts
 async function fetchApplePodcastTranscripts(identifier: string, usedLinks: Set<string>) {
@@ -151,7 +146,7 @@ async function fetchContentForClaim(identifier: string, category: string, usedLi
     ];
 
     const searchRequests = platformQueries.map(({ query, num }) => 
-      fetch("https://google.serper.dev/search", {
+      serperLimit(() => fetch("https://google.serper.dev/search", {
         method: "POST",
         headers: {
           "X-API-KEY": process.env.SERPER_API_KEY!,
@@ -164,7 +159,7 @@ async function fetchContentForClaim(identifier: string, category: string, usedLi
           hl: "en"
         })
       })
-    );
+    ));
 
     const responses = await Promise.all(searchRequests);
     const results = await Promise.all(responses.map(r => r.json()));
@@ -193,30 +188,17 @@ async function fetchContentForClaim(identifier: string, category: string, usedLi
 // Helper function to categorize claims
 async function categorizeClaim(text: string): Promise<{ category: HealthClaimCategory, confidence: number }> {
   try {
-    const [deepseekRes, openaiRes] = await Promise.allSettled([
-      deepseek.chat.completions.create({
-        model: "deepseek-chat",
-        messages: [{
-          role: "system",
-          content: "Categorize into: Nutrition, Medicine, Mental Health, Fitness, Sleep, Performance, Neuroscience. Only category name."
-        }, {
-          role: "user",
-          content: text
-        }],
-        max_tokens: 20
-      }),
-      openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{
-          role: "system",
-          content: "Categorize into: Nutrition, Medicine, Mental Health, Fitness, Sleep, Performance, Neuroscience. Only category name."
-        }, {
-          role: "user",
-          content: text
-        }],
-        max_tokens: 20
-      })
-    ]);
+    const openaiRes = await openaiLimit(() => openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "system",
+        content: "Categorize into: Nutrition, Medicine, Mental Health, Fitness, Sleep, Performance, Neuroscience. Only category name."
+      }, {
+        role: "user",
+        content: text
+      }],
+      max_tokens: 20
+    }));
 
     const validCategories: HealthClaimCategory[] = [
       'Nutrition', 'Medicine', 'Mental Health', 
@@ -231,14 +213,11 @@ async function categorizeClaim(text: string): Promise<{ category: HealthClaimCat
         : 'Uncategorized';
     };
 
-    const categories = [
-      deepseekRes.status === 'fulfilled' ? getValidCategory(deepseekRes.value.choices[0]?.message?.content || '') : null,
-      openaiRes.status === 'fulfilled' ? getValidCategory(openaiRes.value.choices[0]?.message?.content || '') : null
-    ].filter(Boolean) as HealthClaimCategory[];
+    const category = getValidCategory(openaiRes.choices[0]?.message?.content || '');
 
     return {
-      category: categories[0] || 'Uncategorized',
-      confidence: Math.round((categories.filter(c => c === categories[0]).length / 2) * 100)
+      category,
+      confidence: 100 // Single source, so confidence is either 100 or 0
     };
   } catch (error) {
     console.error("Categorization error:", error);
@@ -254,7 +233,7 @@ async function verifyClaim(content: string, category: HealthClaimCategory, influ
   try {
     const contentSources = await fetchContentForClaim(influencerIdentifier, category, globalUsedLinks);
 
-    const serperResponse = await fetch("https://google.serper.dev/search", {
+    const serperResponse = await serperLimit(() => fetch("https://google.serper.dev/search", {
       method: "POST",
       headers: {
         "X-API-KEY": process.env.SERPER_API_KEY!,
@@ -266,7 +245,7 @@ async function verifyClaim(content: string, category: HealthClaimCategory, influ
         gl: "us",
         hl: "en"
       })
-    });
+    }));
 
     const serperData = await serperResponse.json();
     const scientificSources = serperData.organic
@@ -277,7 +256,7 @@ async function verifyClaim(content: string, category: HealthClaimCategory, influ
 
     let status: VerificationStatus;
     if (scientificSources.length >= 2) {
-      const contradictionCheck = await perplexity.chat.completions.create({
+      const contradictionCheck = await perplexityLimit(() => perplexity.chat.completions.create({
         model: "llama-3.1-sonar-small-128k-online",
         messages: [{
           role: "system",
@@ -287,7 +266,7 @@ async function verifyClaim(content: string, category: HealthClaimCategory, influ
           content: `Claim: ${content}\nSources: ${scientificSources.join(", ")}`
         }],
         max_tokens: 100
-      });
+      }));
 
       const analysis = contradictionCheck.choices[0]?.message?.content?.trim().toUpperCase();
       status = analysis === 'CONTRADICTS' ? 'Debunked' : 'Verified';
@@ -349,7 +328,7 @@ export async function processClaims(influencerIdentifier: string) {
 
     // Phase 3: Extract and categorize claims
     console.log("Phase 3: Extracting and categorizing claims...");
-    const extractionResponse = await perplexity.chat.completions.create({
+    const extractionResponse = await openaiLimit(() => openai.chat.completions.create({
       model: "llama-3.1-sonar-small-128k-online",
       messages: [{
         role: "system",
@@ -359,17 +338,17 @@ export async function processClaims(influencerIdentifier: string) {
         content: rawText
       }],
       max_tokens: 2000
-    });
+    }));
 
     const rawClaims = extractionResponse.choices[0]?.message?.content
       ?.split("\n")
       ?.filter(line => line.startsWith("- "))
       ?.map(line => line.substring(2)) || [];
 
-    const embeddingResponse = await openai.embeddings.create({
+    const embeddingResponse = await openaiLimit(() => openai.embeddings.create({
       model: "text-embedding-3-small",
       input: rawClaims,
-    });
+    }))
 
     const uniqueClaims = embeddingResponse.data.reduce((acc, curr, index) => {
       const isDuplicate = acc.some(existing => 

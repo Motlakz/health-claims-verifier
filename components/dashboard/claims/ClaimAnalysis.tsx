@@ -19,7 +19,7 @@ import {
   CheckCircle, 
   Globe, 
   Info, 
-  Loader2, 
+  Loader, 
   PodcastIcon, 
   Twitter, 
   Youtube 
@@ -150,12 +150,12 @@ export function ClaimAnalysis({ className, onNewAnalysis }: ClaimAnalysisProps) 
           >
             {isAnalyzing ? (
               <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader className="h-4 w-4 animate-spin" />
                 Analyzing content...
               </span>
             ) : isSaving ? (
               <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader className="h-4 w-4 animate-spin" />
                 Saving analysis...
               </span>
             ) : (
@@ -193,7 +193,7 @@ export function ClaimAnalysis({ className, onNewAnalysis }: ClaimAnalysisProps) 
   
         {(isAnalyzing || isSaving) && !results && (
           <div className="p-4 bg-muted/50 rounded-lg text-center text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+            <Loader className="h-8 w-8 animate-spin mx-auto mb-2" />
             <p>{isAnalyzing ? "Analyzing content sources..." : "Saving analysis..."}</p>
             <p className="text-xs mt-2">{isAnalyzing ? "This may take 1-2 minutes" : "Almost done..."}</p>
           </div>
