@@ -464,17 +464,17 @@ async function extractInfluencerDetails(rawText: string, contentSources: any[]):
       model: "gpt-4o-mini",
       messages: [{
         role: "system",
-        content: `Extract the influencer's details based on their name, handle, platform, follower count, likes count, comments count, shares, and average views from the provided text. 
-        Respond in JSON format: {
-          name: string,
-          handle: string,
-          platform: string,
-          followerCount: number,
-          likes: number,
-          comments: number,
-          shares: number,
-          avgViews: number,
-          lastUploadDate: string (ISO format)
+        content: `Extract the influencer's details as valid JSON without markdown formatting based on their name, handle, platform, follower count, likes count, comments count, shares, and average views from the provided text. 
+        Required format: {
+          "name": string,
+          "handle": string,
+          "platform": string,
+          "followerCount": number,
+          "likes": number,
+          "comments": number,
+          "shares": number,
+          "avgViews": number,
+          "lastUploadDate": string (ISO format)
         }`
       }, {
         role: "user",
@@ -499,7 +499,12 @@ async function extractInfluencerDetails(rawText: string, contentSources: any[]):
 
     if (extractedJson) {
       try {
-        const cleanedJson = extractedJson.replace(/```json/g, '').replace(/```/g, '').trim();
+        const cleanedJson = extractedJson
+          .replace(/```json/g, '')
+          .replace(/```/g, '')
+          .replace(/^`+/gm, '') // Remove any leading backticks in lines
+          .replace(/`+$/gm, '') // Remove any trailing backticks in lines
+          .trim();
         const parsedData = JSON.parse(cleanedJson);
         
         // Extract basic details and metrics
