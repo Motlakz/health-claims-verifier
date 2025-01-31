@@ -11,6 +11,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import Link from "next/link"
 
 export function UserNav() {
     return (
@@ -43,7 +44,7 @@ export function UserNav() {
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                    Sign Out
+                    <Link href="/">Sign Out</Link>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

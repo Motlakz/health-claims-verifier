@@ -86,3 +86,17 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.highlight-mini {
+  text-shadow: 1px 1px 1px #000;
+}
+
+@keyframes border-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-border {
+  animation: border-rotate 3s ease infinite;
+}

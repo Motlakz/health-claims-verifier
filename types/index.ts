@@ -1,26 +1,61 @@
-export type HealthClaim = {
-    id: string;
-    influencerId: string;
-    content: string;
-    category: 'Nutrition' | 'Medicine' | 'Mental Health' | 'Fitness' | 'Sleep' | 'Performance';
-    verificationStatus: 'Verified' | 'Questionable' | 'Debunked';
-    trustScore: number;
-    sourceUrl: string;
-    verificationSources: string[];
-    createdAt: Date;
+export interface HealthClaim {
+    id: string
+    influencerId: string
+    content: string
+    category: HealthClaimCategory
+    verificationStatus: VerificationStatus
+    trustScore: number
+    createdAt: Date
+    analysis?: string
+    sources: {
+        contentSources: string[]
+        scientificSources: string[]
+    }
+}
+
+export const AppwriteCategoryMap: Record<HealthClaimCategory, string> = {
+    'Nutrition': 'Nutrition',
+    'Medicine': 'Medicine',
+    'Mental Health': 'MentalHealth', // Map "Mental Health" to "MentalHealth"
+    'Fitness': 'Fitness',
+    'Sleep': 'Sleep',
+    'Performance': 'Performance',
+    'Neuroscience': 'Neuroscience',
+    'Uncategorized': 'Uncategorized'
 };
 
-export interface Demographics {
-    gender: Record<string, number>;
-    age: Record<string, number>;
-}
+export type HealthClaimCategory = 
+    | 'Nutrition' 
+    | 'Medicine' 
+    | 'Mental Health' 
+    | 'Fitness' 
+    | 'Sleep' 
+    | 'Performance' 
+    | 'Neuroscience'
+    | 'Uncategorized'
+
+export const CATEGORY_COLORS: Record<HealthClaimCategory, string> = {
+    'Nutrition': 'bg-green-500/10 text-green-500 hover:bg-green-500/20',
+    'Medicine': 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20',
+    'Mental Health': 'bg-purple-500/10 text-purple-500 hover:bg-purple-500/20',
+    'Fitness': 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/20',
+    'Sleep': 'bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20',
+    'Performance': 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20',
+    'Neuroscience': 'bg-pink-500/10 text-pink-500 hover:bg-pink-500/20',
+    'Uncategorized': 'bg-gray-500/10 text-gray-500 hover:bg-gray-500/20',
+};
+
+export type VerificationStatus = 
+    | "Verified"
+    | "Questionable"
+    | "Debunked";
 
 export interface Influencer {
     id: string;
     name: string;
     handle: string;
     avatarUrl: string;
-    category: string;
+    category: HealthClaimCategory;
     averageTrustScore: number;
     trend: "up" | "down";
     followerCount: number;
@@ -28,7 +63,6 @@ export interface Influencer {
     verifiedClaims: number;
     questionableClaims: number;
     debunkedClaims: number;
-    yearlyRevenue: string;
     platform: string;
     likes: number;
     comments: number;
@@ -36,24 +70,5 @@ export interface Influencer {
     avgViews: number;
     engagementRate: number;
     lastUploadDate: string;
-    claims: Array<{
-        id: string;
-        title: string;
-        status: "verified" | "questionable" | "debunked";
-        date: string;
-        source?: string;
-        analysis?: string;
-    }>;
-    products?: number;
-    demographics?: Demographics
+    claims: HealthClaim[];
 }
-  
-export type AnalysisConfig = {
-    dateRange: {
-        start: Date;
-        end: Date;
-    };
-    claimsLimit: number;
-    journals: string[];
-    platforms: string[];
-};

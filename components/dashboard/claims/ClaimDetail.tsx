@@ -1,20 +1,17 @@
 "use client"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { mockClaims, mockInfluencers } from "@/types/mock-data"
 import { ExternalLink } from "lucide-react"
+import { HealthClaim } from "@/types"
 
 interface ClaimDetailProps {
-    claimId: string
+    claim: HealthClaim
 }
 
-export function ClaimDetail({ claimId }: ClaimDetailProps) {
-    const claim = mockClaims.find(c => c.id === claimId) || mockClaims[0]
-    const influencer = mockInfluencers[claim.influencerId]
-
+export function ClaimDetail({ claim }: ClaimDetailProps) {
     return (
         <div className="space-y-6 p-6 bg-background">
             <div className="flex items-center justify-between">
@@ -43,17 +40,13 @@ export function ClaimDetail({ claimId }: ClaimDetailProps) {
                     <CardHeader>
                         <div className="flex items-center space-x-4">
                             <Avatar className="h-12 w-12">
-                                <AvatarImage src={influencer.avatarUrl} />
                                 <AvatarFallback>
-                                    {influencer.name.charAt(0)}
+                                    {claim.influencerId.charAt(0)}
                                 </AvatarFallback>
                             </Avatar>
                             <div>
                                 <p className="text-sm font-medium leading-none">
-                                    {influencer.name}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    {influencer.handle}
+                                    {claim.influencerId}
                                 </p>
                             </div>
                         </div>
@@ -63,7 +56,7 @@ export function ClaimDetail({ claimId }: ClaimDetailProps) {
                         <div className="mt-4 flex items-center space-x-4">
                             <Badge variant="outline">{claim.category}</Badge>
                             <span className="text-sm text-muted-foreground">
-                                {claim.createdAt.toLocaleDateString()}
+                                {new Date(claim.createdAt).toLocaleDateString()}
                             </span>
                         </div>
                     </CardContent>
@@ -102,7 +95,7 @@ export function ClaimDetail({ claimId }: ClaimDetailProps) {
                 <TabsContent value="analysis" className="space-y-4">
                     <Card className="bg-card">
                         <CardContent className="pt-6">
-                            <p>Analysis of the claim and its scientific basis.</p>
+                            <p>{claim.analysis || "No analysis available."}</p>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -110,16 +103,49 @@ export function ClaimDetail({ claimId }: ClaimDetailProps) {
                 <TabsContent value="sources" className="space-y-4">
                     <Card className="bg-card">
                         <CardContent className="pt-6">
-                            <ul className="space-y-2">
-                                {claim.verificationSources.map((source, i) => (
-                                    <li key={i} className="flex items-center space-x-2">
-                                        <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-sm text-primary">
-                                            {source}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
+                            <div className="space-y-4">
+                                {claim.sources.scientificSources?.length > 0 && (
+                                    <div>
+                                        <h4 className="font-medium mb-2">Scientific Sources</h4>
+                                        <ul className="space-y-2">
+                                            {claim.sources.scientificSources.map((source, i) => (
+                                                <li key={i} className="flex items-center space-x-2">
+                                                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                                                    <a 
+                                                        href={source}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-sm text-primary hover:underline"
+                                                    >
+                                                        {source}
+                                                    </a>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {claim.sources.contentSources?.length > 0 && (
+                                    <div>
+                                        <h4 className="font-medium mb-2">Content Sources</h4>
+                                        <ul className="space-y-2">
+                                            {claim.sources.contentSources.map((source, i) => (
+                                                <li key={i} className="flex items-center space-x-2">
+                                                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                                                    <a 
+                                                        href={source}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-sm text-primary hover:underline"
+                                                    >
+                                                        {source}
+                                                    </a>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>

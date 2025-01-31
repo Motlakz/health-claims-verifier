@@ -1,8 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { Clock, Eye, Heart, MessageSquare, Share } from "lucide-react"
-import MetricItem from "./MetricItem"
+import { Clock, Eye, Heart, MessageSquare, Share } from "lucide-react";
+import MetricItem from "./MetricItem";
 
-const EngagementSection = ({ likes, comments, shares, avgViews, lastUpload }: any) => (
+interface EngagementSectionProps {
+    likes: number;
+    comments: number;
+    shares: number;
+    avgViews: number;
+    lastUpload: string;
+}
+
+const EngagementSection = ({ likes, comments, shares, avgViews, lastUpload }: EngagementSectionProps) => (
     <div className="border rounded p-2 shadow">
         <h4 className="font-medium mb-4">Engagement Metrics</h4>
         <div className="space-y-3">
@@ -13,6 +20,6 @@ const EngagementSection = ({ likes, comments, shares, avgViews, lastUpload }: an
             <MetricItem icon={<Clock className="h-4 w-4 text-orange-400" />} label="Last Upload" value={new Date(lastUpload).toLocaleDateString()} />
         </div>
     </div>
-)
+);
 
-export default EngagementSection
+export default EngagementSection;

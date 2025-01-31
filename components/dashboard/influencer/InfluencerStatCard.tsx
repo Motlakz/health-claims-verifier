@@ -1,9 +1,24 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Card, CardContent } from "../../ui/card";
 import { cn } from "@/lib/utils";
 
-export default function InfluencerStatCard({ title, value, subtitle, icon, trend, colorClass }: any) {
+interface InfluencerStatCardProps {
+    title: string;
+    value: string | number;
+    subtitle?: string;
+    icon?: React.ReactNode;
+    trend?: "up" | "down";
+    colorClass?: string;
+}
+
+export default function InfluencerStatCard({ 
+    title, 
+    value, 
+    subtitle, 
+    icon, 
+    trend, 
+    colorClass 
+}: InfluencerStatCardProps) {
     return (
         <Card>
             <CardContent className="pt-6">
@@ -17,9 +32,8 @@ export default function InfluencerStatCard({ title, value, subtitle, icon, trend
                     {!trend && icon}
                 </div>
                 <div className={cn("text-2xl font-bold", colorClass)}>{value}</div>
-                <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>
+                {subtitle && <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>}
             </CardContent>
         </Card>
-    )
+    );
 }
-    

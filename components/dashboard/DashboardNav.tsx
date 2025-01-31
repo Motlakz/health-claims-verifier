@@ -22,7 +22,7 @@ const items = [
         icon: Users,
     },
     {
-        title: "Claims",
+        title: "Claims Analysis",
         href: "/dashboard/claims",
         icon: FileText,
     },

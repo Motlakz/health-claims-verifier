@@ -12,6 +12,6 @@ const MetricItem = ({ icon, label, value }: MetricItemProps) => (
         </div>
         <span className="font-medium">{value}</span>
     </div>
-)
+);
 
-export default MetricItem
+export default MetricItem;

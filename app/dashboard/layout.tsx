@@ -11,7 +11,7 @@ export default function DashboardLayout({
             <header className="sticky top-0 z-40 border-b bg-background px-4">
                 <div className="flex h-16 items-center justify-between py-4">
                     <div className="flex gap-6 md:gap-10">
-                        <h1 className="font-bold">Health Claims Verifier</h1>
+                        <h1 className="font-extrabold highlight-mini text-2xl text-orange-400">Truth<span className="text-indigo-500">Fluencer</span></h1>
                     </div>
                     <UserNav />
                 </div>

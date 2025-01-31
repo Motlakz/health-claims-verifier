@@ -40,10 +40,12 @@ export function ClaimsFilter() {
                     <SelectItem value="all">All Categories</SelectItem>
                     <SelectItem value="nutrition">Nutrition</SelectItem>
                     <SelectItem value="fitness">Fitness</SelectItem>
-                    <SelectItem value="mental-health">Mental Health</SelectItem>
-                    <SelectItem value="medical">Medical</SelectItem>
+                    <SelectItem value="mentalhealth">Mental Health</SelectItem>
+                    <SelectItem value="medicine">Medicine</SelectItem>
                     <SelectItem value="sleep">Sleep</SelectItem>
                     <SelectItem value="performance">Performance</SelectItem>
+                    <SelectItem value="neuroscience">Neuroscience</SelectItem>
+                    <SelectItem value="uncategorized">Uncategorized</SelectItem>
                 </SelectContent>
             </Select>
 

@@ -20,8 +20,9 @@ interface RecentClaimsProps {
 export function RecentClaims({ claims }: RecentClaimsProps) {
     const router = useRouter()
 
-    const handleRowClick = (claimId: string) => {
-        router.push(`/dashboard/claims/${claimId}`)
+    const handleRowClick = (claim: HealthClaim) => {
+        const encodedClaimData = encodeURIComponent(JSON.stringify(claim))
+        router.push(`/dashboard/claims/${claim.id}?claimData=${encodedClaimData}`)
     }
 
     return (
@@ -43,7 +44,7 @@ export function RecentClaims({ claims }: RecentClaimsProps) {
                         {claims.map((claim) => (
                             <TableRow 
                                 key={claim.id}
-                                onClick={() => handleRowClick(claim.id)}
+                                onClick={() => handleRowClick(claim)}
                                 className="cursor-pointer hover:bg-muted/50"
                             >
                                 <TableCell className="font-medium">{claim.content}</TableCell>

@@ -16,7 +16,6 @@ export default function SpecificInfluencerTab() {
     const [influencerIdentifier, setInfluencerIdentifier] = useState('')
     const [timeRange, setTimeRange] = useState('last-month')
     const [productsCount, setProductsCount] = useState(10)
-    const [includeRevenue, setIncludeRevenue] = useState(true)
     const [notes, setNotes] = useState('')
     const [claimsCount, setClaimsCount] = useState(50)
     const [selectedJournals, setSelectedJournals] = useState<Set<string>>(new Set())
@@ -62,7 +61,6 @@ export default function SpecificInfluencerTab() {
             identifierType: influencerInputType,
             timeRange,
             productsCount,
-            includeRevenue,
             notes,
             claimsCount,
             journals: Array.from(selectedJournals)
@@ -141,14 +139,6 @@ export default function SpecificInfluencerTab() {
                 </div>
 
                 <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                    id="revenue-analysis"
-                    checked={includeRevenue}
-                    onCheckedChange={(checked) => setIncludeRevenue(Boolean(checked))}
-                    />
-                    <Label htmlFor="revenue-analysis">Include Revenue Analysis</Label>
-                </div>
 
                 <div className="space-y-2">
                     <Label>Research Notes</Label>

@@ -1,8 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { AlertTriangle, Check, X } from "lucide-react"
-import MetricItem from "./MetricItem"
+import { AlertTriangle, Check, X } from "lucide-react";
+import MetricItem from "./MetricItem";
 
-const ClaimsBreakdown = ({ verified, questionable, debunked, total }: any) => (
+interface ClaimsBreakdownProps {
+    verified: number;
+    questionable: number;
+    debunked: number;
+    total: number;
+}
+
+const ClaimsBreakdown = ({ verified, questionable, debunked, total }: ClaimsBreakdownProps) => (
     <div className="border rounded p-2 shadow">
         <h4 className="font-medium mb-4">Claims Breakdown</h4>
         <div className="space-y-3">
@@ -15,6 +21,6 @@ const ClaimsBreakdown = ({ verified, questionable, debunked, total }: any) => (
             <MetricItem icon={<X className="h-4 w-4 text-red-500" />} label="Debunked" value={debunked} />
         </div>
     </div>
-)
+);
 
-export default ClaimsBreakdown
+export default ClaimsBreakdown;

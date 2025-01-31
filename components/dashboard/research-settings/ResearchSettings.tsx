@@ -8,6 +8,7 @@ import ResearchTasksTab from './ResearchTasks'
 import SpecificInfluencerTab from './InfluencerResearch'
 import DiscoverNewTab from './DiscoveryTab'
 import { LogOut } from 'lucide-react'
+import Link from 'next/link'
 
 export default function ResearchSettings() {
     const [activeTab, setActiveTab] = useState<'specific' | 'discover' | 'tasks'>('specific')
@@ -17,9 +18,8 @@ export default function ResearchSettings() {
             <div className="flex flex-col p-4 md:p-6">
                 <div className="flex items-center justify-between mb-6">
                     <h1 className="text-2xl font-bold">Research Configuration</h1>
-                    <Button>
-                        Sign Out
-                        <LogOut />
+                    <Button asChild variant="outline">
+                        <Link href="/">Sign Out <LogOut className="w-5 h-5" /></Link>
                     </Button>
                 </div>
 
