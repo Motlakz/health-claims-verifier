@@ -328,7 +328,7 @@ export async function processClaims(influencerIdentifier: string) {
 
     // Phase 3: Extract and categorize claims
     console.log("Phase 3: Extracting and categorizing claims...");
-    const extractionResponse = await perplexityLimit(() => openai.chat.completions.create({
+    const extractionResponse = await perplexityLimit(() => perplexity.chat.completions.create({
       model: "llama-3.1-sonar-small-128k-online",
       messages: [{
         role: "system",
