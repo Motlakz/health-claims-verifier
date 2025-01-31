@@ -449,8 +449,8 @@ type NumericFields = 'likes' | 'comments' | 'shares' | 'avgViews' | 'followerCou
 
 async function extractInfluencerDetails(rawText: string, contentSources: any[]): Promise<InfluencerDetails> {
   try {
-    const extractionResponse = await deepseek.chat.completions.create({
-      model: "deepseek-chat",
+    const extractionResponse = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [{
         role: "system",
         content: `Extract the influencer's details based on their name, handle, platform, follower count, likes count, comments count, shares, and average views from the provided text. 
