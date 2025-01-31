@@ -185,19 +185,19 @@ async function fetchContentForClaim(identifier: string, category: string, usedLi
   }
 }
 
-// Helper function to categorize claims
-async function categorizeClaim(text: string): Promise<{ category: HealthClaimCategory, confidence: number }> {
+async function batchCategorizeClaims(texts: string[]): Promise<{ category: HealthClaimCategory, confidence: number }[]> {
   try {
     const openaiRes = await openaiLimit(() => openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{
         role: "system",
-        content: "Categorize into: Nutrition, Medicine, Mental Health, Fitness, Sleep, Performance, Neuroscience. Only category name."
+        content: "Categorize these claims into: Nutrition, Medicine, Mental Health, Fitness, Sleep, Performance, Neuroscience. Return a JSON array of category strings in the same order."
       }, {
         role: "user",
-        content: text
+        content: JSON.stringify(texts)
       }],
-      max_tokens: 20
+      response_format: { type: "json_object" },
+      max_tokens: 400
     }));
 
     const validCategories: HealthClaimCategory[] = [
@@ -213,91 +213,125 @@ async function categorizeClaim(text: string): Promise<{ category: HealthClaimCat
         : 'Uncategorized';
     };
 
-    const category = getValidCategory(openaiRes.choices[0]?.message?.content || '');
+    const responseContent = openaiRes.choices[0]?.message?.content;
+    if (!responseContent) {
+      return texts.map(() => ({
+        category: 'Uncategorized',
+        confidence: 0
+      }));
+    }
 
-    return {
-      category,
-      confidence: 100 // Single source, so confidence is either 100 or 0
-    };
+    const parsedResponse = JSON.parse(responseContent);
+    const categories = parsedResponse.categories || [];
+
+    return texts.map((_, index) => {
+      const category = getValidCategory(categories[index] || 'Uncategorized');
+      return {
+        category,
+        confidence: category === 'Uncategorized' ? 0 : 100
+      };
+    });
   } catch (error) {
-    console.error("Categorization error:", error);
-    return {
+    console.error("Batch categorization error:", error);
+    return texts.map(() => ({
       category: 'Uncategorized',
       confidence: 0
-    };
+    }));
   }
 }
 
-// Helper function to verify claims
-async function verifyClaim(content: string, category: HealthClaimCategory, influencerIdentifier: string, globalUsedLinks: Set<string>) {
+// Batch verification function
+async function batchVerifyClaims(claims: { content: string, category: HealthClaimCategory }[], influencerIdentifier: string, globalUsedLinks: Set<string>) {
   try {
-    const contentSources = await fetchContentForClaim(influencerIdentifier, category, globalUsedLinks);
+    return await Promise.all(
+      claims.map(async ({ content, category }) => {
+        try {
+          const contentSources = await fetchContentForClaim(influencerIdentifier, category, globalUsedLinks);
 
-    const serperResponse = await serperLimit(() => fetch("https://google.serper.dev/search", {
-      method: "POST",
-      headers: {
-        "X-API-KEY": process.env.SERPER_API_KEY!,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        q: `${content} scientific research site:.gov OR site:.edu OR site:jamanetwork.com OR site:thelancet.com`,
-        num: 2,
-        gl: "us",
-        hl: "en"
+          const serperResponse = await serperLimit(() => fetch("https://google.serper.dev/search", {
+            method: "POST",
+            headers: {
+              "X-API-KEY": process.env.SERPER_API_KEY!,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              q: `${content} scientific research site:.gov OR site:.edu OR site:jamanetwork.com OR site:thelancet.com`,
+              num: 2,
+              gl: "us",
+              hl: "en"
+            })
+          }));
+
+          const serperData = await serperResponse.json();
+          const scientificSources = serperData.organic
+            ?.map((item: any) => item.link)
+            ?.filter((link: string) => !globalUsedLinks.has(link)) || [];
+
+          scientificSources.forEach((link: string) => globalUsedLinks.add(link));
+
+          let status: VerificationStatus;
+          if (scientificSources.length >= 2) {
+            const contradictionCheck = await perplexityLimit(() => perplexity.chat.completions.create({
+              model: "llama-3.1-sonar-small-128k-online",
+              messages: [{
+                role: "system",
+                content: "Analyze if these sources support or contradict the claim. Response: SUPPORTS/CONTRADICTS"
+              }, {
+                role: "user",
+                content: `Claim: ${content}\nSources: ${scientificSources.join(", ")}`
+              }],
+              max_tokens: 100
+            }));
+
+            const analysis = contradictionCheck.choices[0]?.message?.content?.trim().toUpperCase();
+            status = analysis === 'CONTRADICTS' ? 'Debunked' : 'Verified';
+          } else {
+            status = 'Questionable';
+          }
+
+          return {
+            id: `claim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+            content,
+            category,
+            verificationStatus: status,
+            trustScore: calculateTrustScore(scientificSources, status),
+            sources: {
+              contentSources,
+              scientificSources
+            },
+            influencerId: influencerIdentifier,
+            createdAt: new Date(),
+            analysis: status === 'Verified' 
+              ? `Verified with ${scientificSources.length} trusted sources`
+              : status === 'Debunked'
+              ? "Scientific evidence contradicts this claim"
+              : "Insufficient scientific evidence"
+          };
+        } catch (error) {
+          console.error("Verification failed for claim:", error);
+          return {
+            id: `claim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+            content,
+            category: "Uncategorized" as HealthClaimCategory,
+            verificationStatus: "Questionable" as VerificationStatus,
+            trustScore: 40,
+            sources: {
+              contentSources: [],
+              scientificSources: []
+            },
+            influencerId: influencerIdentifier,
+            createdAt: new Date(),
+            analysis: "Verification failed due to API error"
+          };
+        }
       })
-    }));
-
-    const serperData = await serperResponse.json();
-    const scientificSources = serperData.organic
-      ?.map((item: any) => item.link)
-      ?.filter((link: string) => !globalUsedLinks.has(link)) || [];
-
-    scientificSources.forEach((link: string) => globalUsedLinks.add(link));
-
-    let status: VerificationStatus;
-    if (scientificSources.length >= 2) {
-      const contradictionCheck = await perplexityLimit(() => perplexity.chat.completions.create({
-        model: "llama-3.1-sonar-small-128k-online",
-        messages: [{
-          role: "system",
-          content: "Analyze if these sources support or contradict the claim. Response: SUPPORTS/CONTRADICTS"
-        }, {
-          role: "user",
-          content: `Claim: ${content}\nSources: ${scientificSources.join(", ")}`
-        }],
-        max_tokens: 100
-      }));
-
-      const analysis = contradictionCheck.choices[0]?.message?.content?.trim().toUpperCase();
-      status = analysis === 'CONTRADICTS' ? 'Debunked' : 'Verified';
-    } else {
-      status = 'Questionable';
-    }
-
-    return {
+    );
+  } catch (error) {
+    console.error("Batch verification error:", error);
+    return claims.map(({ content, category }) => ({
       id: `claim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       content,
       category,
-      verificationStatus: status,
-      trustScore: calculateTrustScore(scientificSources, status),
-      sources: {
-        contentSources,
-        scientificSources
-      },
-      influencerId: influencerIdentifier,
-      createdAt: new Date(),
-      analysis: status === 'Verified' 
-        ? `Verified with ${scientificSources.length} trusted sources`
-        : status === 'Debunked'
-        ? "Scientific evidence contradicts this claim"
-        : "Insufficient scientific evidence"
-    };
-  } catch (error) {
-    console.error("Verification failed:", error);
-    return {
-      id: `claim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      content,
-      category: "Uncategorized" as HealthClaimCategory,
       verificationStatus: "Questionable" as VerificationStatus,
       trustScore: 40,
       sources: {
@@ -306,12 +340,12 @@ async function verifyClaim(content: string, category: HealthClaimCategory, influ
       },
       influencerId: influencerIdentifier,
       createdAt: new Date(),
-      analysis: "Verification failed due to API error"
-    };
+      analysis: "Batch verification failed"
+    }));
   }
 }
 
-// Main function to process claims
+// ProcessClaims function with batch processing
 export async function processClaims(influencerIdentifier: string) {
   try {
     // Phase 1: Fetch and prepare content
@@ -346,9 +380,9 @@ export async function processClaims(influencerIdentifier: string) {
       ?.map(line => line.substring(2)) || [];
 
     const embeddingResponse = await openaiLimit(() => openai.embeddings.create({
-      model: "text-embedding-3-small",
+      model: "text-embedding-3-large",
       input: rawClaims,
-    }))
+    }));
 
     const uniqueClaims = embeddingResponse.data.reduce((acc, curr, index) => {
       const isDuplicate = acc.some(existing => 
@@ -357,27 +391,25 @@ export async function processClaims(influencerIdentifier: string) {
       if (!isDuplicate) {
         acc.push({ text: rawClaims[index], embedding: curr.embedding });
       }
-      return acc
+      return acc;
     }, [] as { text: string; embedding: number[] }[]);
 
-    const categorizedClaims = await Promise.all(
-      uniqueClaims.map(async ({ text }) => {
-        const { category, confidence } = await categorizeClaim(text);
-        return {
-          content: text,
-          category,
-          confidence
-        };
-      })
-    );
+    // Batch categorization
+    const textsToCategorize = uniqueClaims.map(claim => claim.text);
+    const batchCategorizationResults = await batchCategorizeClaims(textsToCategorize);
 
-    // Phase 4: Verify claims
+    const categorizedClaims = uniqueClaims.map((claim, index) => ({
+      content: claim.text,
+      ...batchCategorizationResults[index]
+    }));
+
+    // Phase 4: Batch verification
     console.log("Phase 4: Verifying claims...");
     const globalUsedLinks = new Set<string>(usedLinks);
-    const verifiedClaims = await Promise.all(
-      categorizedClaims.map(async ({ content, category }) => 
-        verifyClaim(content, category, influencerIdentifier, globalUsedLinks)
-      )
+    const verifiedClaims = await batchVerifyClaims(
+      categorizedClaims.map(({ content, category }) => ({ content, category })),
+      influencerIdentifier,
+      globalUsedLinks
     );
 
     // Phase 5: Save claims and update influencer stats
