@@ -1,5 +1,5 @@
 import { databases } from "../appwrite/appwriteConfig";
-import { ID } from "node-appwrite";
+import { ID } from "appwrite";
 import { AppwriteCategoryMap, HealthClaim, HealthClaimCategory, VerificationStatus } from "@/types";
 
 export async function saveClaimsToAppwrite(

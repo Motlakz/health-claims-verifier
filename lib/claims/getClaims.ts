@@ -2,7 +2,6 @@ import { databases } from "../appwrite/appwriteConfig";
 import { Query } from "appwrite";
 import { HealthClaim } from "@/types";
 
-
 export async function fetchClaims(): Promise<HealthClaim[]> {
   try {
     const response = await databases.listDocuments(
